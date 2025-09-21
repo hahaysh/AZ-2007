@@ -142,7 +142,8 @@ async def main():
     target = args.url if args.url else args.server
 
     # env_file은 STDIO일 때 서버 프로세스에 환경변수를 주입합니다(없으면 무시).
-    async with Client(target, env_file=args.env) as client:
+    # async with Client(target, env_file=args.env) as client:
+    async with Client(target) as client:
         await demo_calls(client)
         if not args.quick:
             print("\n(종료하려면 Ctrl+C) 대화형 모드는 생략했습니다.")
