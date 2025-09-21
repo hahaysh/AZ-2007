@@ -1,4 +1,4 @@
-# HellMCP 서버 & 클라이언트 구현.(전체 소스)
+# HelloMCP 서버 & 클라이언트 구현.(전체 소스)
 
 ## server.py (HelloMCP 전용)
 
