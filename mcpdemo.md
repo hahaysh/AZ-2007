@@ -167,7 +167,7 @@ if __name__ == "__main__":
 
 ```bash
 python -m venv .venv
-# Windows: .venv/Scripts/activate
+# Windows: source .venv/Scripts/activate
 # macOS/Linux:
 source .venv/bin/activate
 
