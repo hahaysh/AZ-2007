@@ -183,7 +183,7 @@ pip install fastmcp python-dotenv
 ```dotenv
 # .env  (없어도 실행 가능)
 HELLOMCP_SERVER_NAME=HelloMCP
-GREETING_MESSAGE=안녕하세요! 이것은 HelloMCP 서버의 기본 인사말입니다.
+GREETING_MESSAGE="안녕하세요! 이것은 HelloMCP 서버의 기본 인사말입니다."
 ```
 
 ### 4) 클라이언트로 서버 스폰 & 호출
