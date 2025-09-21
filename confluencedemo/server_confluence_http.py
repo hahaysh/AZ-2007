@@ -31,6 +31,7 @@ def list_spaces(limit: int = 25):
 
 @mcp.tool
 def get_page(page_id: str, body_format: str = "storage"):
+    """페이지 ID로 조회 (본문 포맷 지정 권장)"""
     return _get(f"{BASE_V2}/pages/{page_id}", {"body-format": body_format})
 
 @mcp.tool
@@ -45,6 +46,7 @@ def search_cql(cql: str, limit: int = 10):
 
 @mcp.tool
 def get_children(page_id: str, limit: int = 25):
+    """지정 페이지의 자식 페이지 목록"""
     data = _get(f"{BASE_V2}/pages/{page_id}/children", {"limit": max(1, min(limit, 100))})
     return [{"id": p["id"], "title": p["title"]} for p in data.get("results", [])]
 
