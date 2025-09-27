@@ -13,7 +13,7 @@ https://github.com/skills-dev/code-with-codespaces
 (Getting Started with GitHub Copilot)
 https://github.com/skills/getting-started-with-github-copilot
 
-# GitHub Copilot을 사용하여 단위 테스트 개발
+# GitHub Copilot을 사용하여 단위 테스트 개발 - Codespace
 (Develop unit tests using GitHub Copilot)
 https://microsoftlearning.github.io/mslearn-github-copilot-dev/Instructions/Labs/LAB_AK_04_develop_unit_tests_pytest.html
 

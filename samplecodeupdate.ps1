@@ -1,134 +1,101 @@
-<# 
+<#
 .SYNOPSIS
-  Download & extract SampleApps.zip into a local folder with overwrite.
+  Download all ZIP files containing 'python' (case-insensitive) from a GitHub repo path,
+  extract them into a "samples" subfolder, and remove the ZIP files afterward.
 
-.DESCRIPTION
-  - 지정 URL에서 ZIP 파일을 다운로드
-  - ZIP을 임시 경로에 저장 후 Unblock
-  - 대상 폴더가 없으면 생성
-  - Expand-Archive -Force 로 파일을 덮어쓰기 추출
-  - 완료 후 임시 ZIP 삭제
+.PARAMETER OutDir
+  Base local path where the "samples" folder will be created (default: current directory).
 
-.PARAMETER Destination
-  압축을 풀 대상 폴더 경로 (기본값: .\SampleApps)
+.PARAMETER Owner
+  GitHub organization/owner (default: MicrosoftLearning).
 
-.PARAMETER Url
-  ZIP 다운로드 URL (기본값: MicrosoftLearning APL-2007 SampleApps.zip)
+.PARAMETER Repo
+  GitHub repository name (default: mslearn-github-copilot-dev).
 
-.EXAMPLE
-  .\Get-SampleApps.ps1
-  -> .\SampleApps 폴더로 덮어쓰기 추출
-
-.EXAMPLE
-  .\Get-SampleApps.ps1 -Destination "D:\Lab\SampleApps" -Verbose
+.PARAMETER RepoPath
+  Path inside the repository (default: DownloadableCodeProjects/Downloads).
 #>
 
 [CmdletBinding()]
 param(
-    [string]$Destination = ".\SampleApps",
-    [string]$Url = "https://raw.githubusercontent.com/MicrosoftLearning/APL-2007-Accelerate-app-development-by-using-GitHub-Copilot/master/LearnModuleExercises/Downloads/SampleApps.zip"
+  [string]$OutDir   = (Get-Location).Path,
+  [string]$Owner    = "MicrosoftLearning",
+  [string]$Repo     = "mslearn-github-copilot-dev",
+  [string]$RepoPath = "DownloadableCodeProjects/Downloads"
 )
 
-function Set-Tls12 {
-    try {
-        if ([Net.ServicePointManager]::SecurityProtocol -band [Net.SecurityProtocolType]::Tls12) { return }
-        [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
-        Write-Verbose "TLS 1.2 활성화."
-    } catch {
-        Write-Verbose "TLS 설정을 변경하지 못했습니다(무시 가능): $($_.Exception.Message)"
-    }
-}
-
-function Invoke-DownloadWithRetry {
-    param(
-        [Parameter(Mandatory=$true)][string]$DownloadUrl,
-        [Parameter(Mandatory=$true)][string]$OutFile,
-        [int]$MaxRetry = 3,
-        [int]$DelaySeconds = 2
-    )
-    for ($i=1; $i -le $MaxRetry; $i++) {
-        try {
-            Write-Verbose "다운로드 시도 #$($i): $DownloadUrl"
-            # PS5 호환을 위해 -UseBasicParsing 포함 (PS7에서는 무시됨)
-            Invoke-WebRequest -Uri $DownloadUrl -OutFile $OutFile -UseBasicParsing -TimeoutSec 120
-            if ((Test-Path $OutFile) -and ((Get-Item $OutFile).Length -gt 0)) {
-                Write-Verbose "다운로드 성공: $OutFile"
-                return $true
-            } else {
-                throw "다운로드된 파일이 없거나 비어 있습니다."
-            }
-        } catch {
-            Write-Warning "다운로드 실패: $($_.Exception.Message)"
-            if ($i -lt $MaxRetry) {
-                Start-Sleep -Seconds $DelaySeconds
-            } else {
-                return $false
-            }
-        }
-    }
-}
-
+# Force TLS 1.2 for compatibility
 try {
-    Write-Verbose "작업 시작"
+  [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+} catch { }
 
-    # 1) TLS 1.2 보장 (구형 환경 대비)
-    Set-Tls12
-
-    # 2) 임시 경로 및 파일명 준비
-    $tempDir = [IO.Path]::GetTempPath()
-    $zipPath = Join-Path $tempDir "SampleApps_$([Guid]::NewGuid().ToString('N')).zip"
-
-    # 3) ZIP 다운로드
-    $ok = Invoke-DownloadWithRetry -DownloadUrl $Url -OutFile $zipPath
-    if (-not $ok) { throw "ZIP 파일 다운로드에 최종 실패했습니다." }
-
-    # 4) Zone Identifier 제거 (차단 해제)
-    try {
-        Unblock-File -Path $zipPath -ErrorAction Stop
-        Write-Verbose "ZIP 파일 차단 해제."
-    } catch {
-        Write-Verbose "Unblock-File 실패(무시 가능): $($_.Exception.Message)"
-    }
-
-    # 5) 대상 폴더 생성
-    if (-not (Test-Path $Destination)) {
-        New-Item -ItemType Directory -Path $Destination | Out-Null
-        Write-Verbose "대상 폴더 생성: $Destination"
-    }
-
-    # 6) 압축 해제 (덮어쓰기)
-    Write-Verbose "압축 해제 시작 -> $Destination"
-    Expand-Archive -Path $zipPath -DestinationPath $Destination -Force
-    Write-Host "✅ SampleApps가 '$Destination' 경로로 성공적으로 배포되었습니다." -ForegroundColor Green
-
-    # 7) 압축 해제 후 ZIP 삭제
-    if (Test-Path $zipPath) {
-        Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
-        Write-Verbose "다운받은 ZIP 삭제 완료: $zipPath"
-    }
-
-    # 8) python이 들어간 폴더만 남기고 나머지 최상위 폴더 삭제
-    $subFolders = Get-ChildItem -Path $Destination -Directory
-    foreach ($folder in $subFolders) {
-        if ($folder.Name -notmatch '(?i)python') {
-            try {
-                Remove-Item -Path $folder.FullName -Recurse -Force -ErrorAction Stop
-                Write-Verbose "삭제됨: $($folder.FullName)"
-            } catch {
-                Write-Warning "삭제 실패: $($folder.FullName) - $($_.Exception.Message)"
-            }
-        }
-    }
-    Write-Host "✅ 'python'이름이 들어간 폴더만 남기고 나머지 삭제 완료." -ForegroundColor Green
-
-
-} catch {
-    Write-Error "작업 실패: $($_.Exception.Message)"
-    exit 1
-} finally {
-    # 7) 임시 ZIP 정리
-    if (Test-Path $zipPath) {
-        Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
-        Write-Verbose "임시 ZIP 삭제 완료."
-    }
+# GitHub API endpoint
+$apiUrl  = "https://api.github.com/repos/$Owner/$Repo/contents/$RepoPath"
+$headers = @{
+  "User-Agent" = "PowerShell"
+  "Accept"     = "application/vnd.github+json"
 }
+
+Write-Host "Fetching file list from GitHub... ($apiUrl)"
+try {
+  $items = Invoke-RestMethod -Uri $apiUrl -Headers $headers -ErrorAction Stop
+} catch {
+  Write-Error "Failed to call GitHub API: $($_.Exception.Message)"
+  exit 1
+}
+
+if (-not $items) {
+  Write-Warning "No items found at path: $RepoPath"
+  exit 0
+}
+
+# Filter ZIP files with "python" in the name
+$pythonZips = $items | Where-Object {
+  $_.type -eq 'file' -and $_.name -match '\.zip$' -and $_.name -imatch 'python'
+}
+
+if (-not $pythonZips) {
+  Write-Warning "No ZIP files containing 'python' were found."
+  exit 0
+}
+
+# Create "samples" directory under output base
+$samplesDir = Join-Path $OutDir "samples"
+$null = New-Item -ItemType Directory -Path $samplesDir -Force -ErrorAction SilentlyContinue
+
+foreach ($file in $pythonZips) {
+  $zipName     = $file.name
+  $downloadUrl = $file.download_url
+  if (-not $downloadUrl) {
+    $downloadUrl = "https://raw.githubusercontent.com/$Owner/$Repo/main/$RepoPath/$zipName"
+  }
+
+  $localZip   = Join-Path $samplesDir $zipName
+  $destFolder = Join-Path $samplesDir ([IO.Path]::GetFileNameWithoutExtension($zipName))
+
+  Write-Host "`nDownloading: $zipName"
+  try {
+    Invoke-WebRequest -Uri $downloadUrl -OutFile $localZip -Headers $headers -UseBasicParsing -ErrorAction Stop
+  } catch {
+    Write-Warning "Failed to download $zipName - $($_.Exception.Message)"
+    continue
+  }
+
+  Write-Host "Extracting to: $destFolder"
+  try {
+    $null = New-Item -ItemType Directory -Path $destFolder -Force -ErrorAction SilentlyContinue
+    Expand-Archive -Path $localZip -DestinationPath $destFolder -Force
+  } catch {
+    Write-Warning "Failed to extract $zipName - $($_.Exception.Message)"
+    continue
+  }
+
+  Write-Host "Removing ZIP file: $zipName"
+  try {
+    Remove-Item -LiteralPath $localZip -Force -ErrorAction SilentlyContinue
+  } catch {
+    Write-Warning "Failed to delete $zipName - $($_.Exception.Message)"
+  }
+}
+
+Write-Host "`nAll tasks completed! Extracted projects are under: $samplesDir"
